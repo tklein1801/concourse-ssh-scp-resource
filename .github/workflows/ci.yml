@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -21,6 +22,9 @@ jobs:
 
       - name: Check Python syntax
         run: docker run --rm --entrypoint python concourse-ssh-scp-resource:ci -m py_compile /opt/resource/check /opt/resource/in /opt/resource/out /opt/resource/shared.py
+
+      - name: Run unit and resource tests
+        run: docker run --rm --entrypoint python -e RESOURCE_DIR=/opt/resource -v "$PWD/tests:/tests:ro" concourse-ssh-scp-resource:ci -m unittest discover -s /tests -v
 
       - name: Check SSH and SCP tools
         run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'command -v ssh && command -v scp'
