@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build --tag concourse-ssh-scp-resource:ci .
+
+      - name: Check Python syntax
+        run: docker run --rm --entrypoint python concourse-ssh-scp-resource:ci -m py_compile /opt/resource/check /opt/resource/in /opt/resource/out /opt/resource/shared.py
+
+      - name: Check SSH and SCP tools
+        run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'command -v ssh && command -v scp'
+
+      - name: Smoke test check resource
+        run: docker run --rm --entrypoint /opt/resource/check concourse-ssh-scp-resource:ci
+
+      - name: Smoke test in resource
+        run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'printf "%s" '\''{"source":{"user":"","host":"","private_key":""},"params":{}}'\'' | /opt/resource/in /tmp'
+
+      - name: Smoke test out resource
+        run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'printf "%s" '\''{"source":{"user":"","host":"","private_key":""},"params":{}}'\'' | /opt/resource/out /tmp'
