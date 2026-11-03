@@ -7,7 +7,7 @@ import unittest
 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "src")
+SRC = os.environ.get("RESOURCE_DIR", os.path.join(ROOT, "src"))
 
 
 def run_script(name, args=None, input_text=""):

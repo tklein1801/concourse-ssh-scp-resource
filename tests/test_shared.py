@@ -4,7 +4,11 @@ import tempfile
 import unittest
 from unittest import mock
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+RESOURCE_DIR = os.environ.get(
+    "RESOURCE_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "src"),
+)
+sys.path.insert(0, RESOURCE_DIR)
 
 import shared
 
