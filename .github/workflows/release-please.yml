@@ -1,0 +1,83 @@
+name: Release Please
+
+on:
+  push:
+    branches: [master]
+  pull_request_target:
+    types: [closed]
+    branches: [master]
+
+jobs:
+  release-pr:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Create or update release PR
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish-release:
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login == 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out merged release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Determine release version
+        id: version
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          version="${PR_TITLE#chore: release }"
+          version="${version% [skip ci]}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Unexpected Release Please title: $PR_TITLE" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test release image
+        run: |
+          docker build --tag concourse-ssh-scp-resource:release .
+          docker run --rm --entrypoint python -m py_compile /opt/resource/check /opt/resource/in /opt/resource/out /opt/resource/shared.py
+          docker run --rm --entrypoint python -e RESOURCE_DIR=/opt/resource -v "$PWD/tests:/tests:ro" concourse-ssh-scp-resource:release -m unittest discover -s /tests -v
+          docker run --rm --entrypoint sh concourse-ssh-scp-resource:release -c 'command -v ssh && command -v scp'
+          docker run --rm --entrypoint /opt/resource/check concourse-ssh-scp-resource:release
+
+      - name: Create GitHub release and version tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TARGET: ${{ github.event.pull_request.merge_commit_sha }}
+        run: gh release create "$TAG" --target "$TARGET" --generate-notes
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push versioned image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/tklein1801/concourse-ssh-scp-resource:${{ steps.version.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/tklein1801/concourse-ssh-scp-resource
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}

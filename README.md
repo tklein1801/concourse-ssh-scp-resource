@@ -1,4 +1,4 @@
-![](https://img.shields.io/github/license/Karunamon/concourse-ssh-scp-resource) ![](https://img.shields.io/badge/resource%20url-ghcr.io%2Fkarunamon%2Fssh--scp--resource-blue?logo=Concourse)
+![](https://img.shields.io/github/license/tklein1801/concourse-ssh-scp-resource) ![](https://img.shields.io/badge/resource%20url-ghcr.io%2Ftklein1801%2Fconcourse--ssh--scp--resource-blue?logo=Concourse)
 # ssh-scp-resource
 A Concourse resource to run commands on hosts or copy files to them using SSH or SCP.
 
@@ -53,8 +53,10 @@ Add a new resource type to your pipeline:
 resource_types:
 - name: ssh-scp
   type: registry-image
-  source: { repository: ghcr.io/karunamon/ssh-scp-resource }
+  source: { repository: ghcr.io/tklein1801/concourse-ssh-scp-resource }
 ```
+
+The workflow publishes `latest` after each tested push to `master`. Release Please creates a release pull request from Conventional Commits (`fix:`, `feat:`, or a breaking change). The release pull request title includes `[skip ci]`; use the title as the squash commit message when merging it. After the merge, the release workflow creates the GitHub release, version tag, and image, such as `v1.0.0`. The GHCR package must be set to Public in GitHub package settings for unauthenticated Concourse pulls.
 
 Then, define a resource targeting the system you want to run commands on or copy files to:
 ```yaml
