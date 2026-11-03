@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import json
-import subprocess
+import os
+import shutil
 import sys
+import tempfile
 
 from datetime import datetime
 from shared import *
@@ -13,7 +15,8 @@ config_schema = {
     "source": {
         "user": "",
         "host": "",
-        "private_key": ""
+        "private_key": "",
+        "known_hosts": ""
     },
     "params": {}
 }
@@ -25,13 +28,28 @@ def main(path, config):
     private_key = config["source"]["private_key"]
     params = config["params"]
 
-    private_key_path = write_private_key(path, private_key)
+    if not isinstance(params, dict):
+        raise ValueError("Expected 'params' to be a dict")
+    if not isinstance(user, str) or not user or not isinstance(host, str) or not host:
+        raise ValueError("source.user and source.host must be non-empty strings")
+    if not isinstance(private_key, str) or not private_key:
+        raise ValueError("source.private_key must be a non-empty string")
 
-    if "files" in params:
-        scpTo(user, host, private_key_path, path, params["files"])
+    if not config["source"]["known_hosts"].strip():
+        raise ValueError("source.known_hosts must contain trusted SSH host keys")
+    secret_dir = tempfile.mkdtemp(prefix="concourse-ssh-")
+    os.chmod(secret_dir, 0o700)
+    try:
+        private_key_path = write_secret(secret_dir, "id_rsa", private_key)
+        known_hosts_path = write_secret(secret_dir, "known_hosts", config["source"]["known_hosts"])
 
-    if "commands" in params:
-        sshRun(user, host, private_key_path, params["commands"])
+        if "files" in params:
+            scpTo(user, host, private_key_path, known_hosts_path, path, params["files"])
+
+        if "commands" in params:
+            sshRun(user, host, private_key_path, known_hosts_path, params["commands"])
+    finally:
+        shutil.rmtree(secret_dir)
 
 path = sys.argv[1]
 config = json.loads(sys.stdin.read())

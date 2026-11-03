@@ -22,6 +22,9 @@ jobs:
       - name: Check Python syntax
         run: docker run --rm --entrypoint python concourse-ssh-scp-resource:ci -m py_compile /opt/resource/check /opt/resource/in /opt/resource/out /opt/resource/shared.py
 
+      - name: Run security unit tests
+        run: docker run --rm --entrypoint python concourse-ssh-scp-resource:ci -m unittest discover -s /opt/resource/tests -v
+
       - name: Check SSH and SCP tools
         run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'command -v ssh && command -v scp'
 
@@ -32,4 +35,4 @@ jobs:
         run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'printf "%s" '\''{"source":{"user":"","host":"","private_key":""},"params":{}}'\'' | /opt/resource/in /tmp'
 
       - name: Smoke test out resource
-        run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'printf "%s" '\''{"source":{"user":"","host":"","private_key":""},"params":{}}'\'' | /opt/resource/out /tmp'
+        run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'printf "%s" '\''{"source":{"user":"","host":"","private_key":"","known_hosts":"example.invalid ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"params":{}}'\'' | /opt/resource/out /tmp'

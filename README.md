@@ -8,6 +8,7 @@ All items are required, and go under the `source` key:
 * `user`: SSH username
 * `host`: Host to log into
 * `private_key`:  Private key for `user`
+* `known_hosts`: Trusted OpenSSH host-key entries for the target. Host-key verification is mandatory.
 
 ## Behavior
 * `check`: Not implemented
@@ -23,7 +24,7 @@ To copy files, add the `files` key to `params`, and under it, give the source as
      "outfiles/page.html": "/var/www/public_html/page.html"
  ```
  
-To run commands, add the `commands` key to `params`, and under that, give the commands to run as list items (prefixed with a `-`). Again, quotes are recommended to avoid YAML surprises. Note that all commands run in a `&&` chain from top to bottom, so failure or a nonzero exit of any command will result in all later commands on this step not executing.
+To run commands, add the `commands` key to `params`, and under that, give the commands to run as list items (prefixed with a `-`). Again, quotes are recommended to avoid YAML surprises. These commands run on the remote host with the configured account and must come only from trusted pipeline configuration. All commands run in a `&&` chain from top to bottom, so failure or a nonzero exit of any command will result in all later commands on this step not executing.
 
 ```yaml
 params:
@@ -64,6 +65,8 @@ resources:
   source:
     user: someuser
     host: mywebserver.com
+    known_hosts: |
+      mywebserver.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...
     private_key: |
       -----BEGIN OPENSSH PRIVATE KEY-----
       ...

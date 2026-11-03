@@ -3,6 +3,7 @@
 import os
 import subprocess
 import sys
+import tempfile
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -18,43 +19,65 @@ def validate_schema(target, schema, prefix=""):
         if isinstance(value, dict):
             validate_schema(target[key], schema[key], "%s." % key)
 
-def write_private_key(path, private_key):
-    private_key_path = "%s/id_rsa" % path
-    
-    file = open(private_key_path, "w")
-    file.write(private_key)
-    file.close()
+def write_secret(directory, name, contents):
+    secret_path = os.path.join(directory, name)
+    fd = os.open(secret_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as secret_file:
+        secret_file.write(contents)
+    return secret_path
 
-    os.chmod(private_key_path, 0o600)
+def _host_options(known_hosts_path):
+    return ["-oStrictHostKeyChecking=yes", "-oUserKnownHostsFile=%s" % known_hosts_path,
+            "-oGlobalKnownHostsFile=/dev/null", "-oBatchMode=yes"]
 
-    return private_key_path
+def _local_source(root, source_file):
+    if not isinstance(source_file, str) or os.path.isabs(source_file):
+        raise ValueError("SCP source paths must be relative to the resource directory")
+    root = os.path.realpath(root)
+    source = os.path.realpath(os.path.join(root, source_file))
+    if os.path.commonpath([root, source]) != root:
+        raise ValueError("SCP source path escapes the resource directory")
+    current = root
+    for part in source_file.split(os.sep):
+        current = os.path.join(current, part)
+        if os.path.islink(current):
+            resolved = os.path.realpath(current)
+            if os.path.commonpath([root, resolved]) != root:
+                raise ValueError("SCP source symlink escapes the resource directory")
+    return source
 
-def scpTo(user, host, private_key_path, path, files):
-    return _scp(user, host, private_key_path, path, files, True)
+def _remote_path(path):
+    if not isinstance(path, str) or not path or path.startswith("-") or "\x00" in path:
+        raise ValueError("Invalid remote SCP path")
+    # OpenSSH's default SFTP transport passes paths without invoking a remote shell.
+    return path
 
-def scpFrom(user, host, private_key_path, path, files):
-    return _scp(user, host, private_key_path, path, files, False)
+def scpTo(user, host, private_key_path, known_hosts_path, path, files):
+    return _scp(user, host, private_key_path, known_hosts_path, path, files, True)
 
-def _scp(user, host, private_key_path, path, files, toRemote):
+def scpFrom(user, host, private_key_path, known_hosts_path, path, files):
+    return _scp(user, host, private_key_path, known_hosts_path, path, files, False)
+
+def _scp(user, host, private_key_path, known_hosts_path, path, files, toRemote):
     if not isinstance(files, dict):
         raise ValueError("Expected 'files' to be a dict, found %s" % type(files).__name__)
 
     for (source_file, destination_file) in files.items():
-        source = "%s/%s" % (path, source_file) if toRemote else "%s@%s:%s" % (user, host, source_file)
-        destination = "%s@%s:%s" % (user, host, destination_file) if toRemote else "%s/%s" % (path, destination_file)
+        source = _local_source(path, source_file) if toRemote else "%s@%s:%s" % (user, host, _remote_path(source_file))
+        destination = "%s@%s:%s" % (user, host, _remote_path(destination_file)) if toRemote else _local_source(path, destination_file)
 
         print(f"{source} -> {destination}")
-        proc = subprocess.run(["scp", "-oStrictHostKeyChecking=no", "-i", private_key_path,"-r", source, destination]
+        proc = subprocess.run(["scp"] + _host_options(known_hosts_path) + ["-i", private_key_path, "-r", source, destination]
                             , check=True
                             , stdout=subprocess.PIPE)
         eprint(proc.stdout.decode("utf-8"))
 
-def sshRun(user, host, private_key_path, commands):
+def sshRun(user, host, private_key_path, known_hosts_path, commands):
     if not isinstance(commands, list):
         raise ValueError("Expected 'commands' to be a list, found %s" % type(commands).__name__)
     
     print(commands)
-    proc = subprocess.run(["ssh", "-oStrictHostKeyChecking=no", "-i", private_key_path, "%s@%s" % (user, host), "%s" % " && ".join(commands)]
+    proc = subprocess.run(["ssh"] + _host_options(known_hosts_path) + ["-i", private_key_path, "%s@%s" % (user, host), "%s" % " && ".join(commands)]
                         , check=True
                         , stdout=subprocess.PIPE)
     eprint(proc.stdout.decode("utf-8"))
