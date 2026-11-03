@@ -36,4 +36,4 @@ jobs:
         run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'printf "%s" '\''{"source":{"user":"","host":"","private_key":""},"params":{}}'\'' | /opt/resource/in /tmp'
 
       - name: Smoke test out resource
-        run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'printf "%s" '\''{"source":{"user":"","host":"","private_key":""},"params":{}}'\'' | /opt/resource/out /tmp'
+        run: docker run --rm --entrypoint sh concourse-ssh-scp-resource:ci -c 'printf "%s" '\''{"source":{"user":"ci-user","host":"example.invalid","private_key":"test-key","known_hosts":"example.invalid ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"params":{}}'\'' | /opt/resource/out /tmp'
