@@ -73,6 +73,15 @@ resources:
       -----END OPENSSH PRIVATE KEY-----
 ```
 
+## Tests
+Run the test suite with Python 3.6 or newer:
+
+```sh
+python -m unittest discover -s tests -v
+```
+
+The tests validate configuration, SSH/SCP command construction, key permissions, and resource script responses. SSH and SCP calls are mocked, so the suite does not connect to remote hosts. GitHub Actions also runs the suite inside the built Docker image.
+
 ## Thanks
 
 [Dan Spencer (@danrspencer)](https://github.com/danrspencer) for writing this. All I've done is minor bug fixing and documentation.
