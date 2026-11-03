@@ -50,7 +50,9 @@ class TransferTests(unittest.TestCase):
         args, kwargs = run.call_args
         self.assertIn("-oStrictHostKeyChecking=yes", args[0])
         self.assertIn("-oUserKnownHostsFile=/known_hosts", args[0])
-        self.assertEqual(args[0][-2:], [os.path.realpath(os.path.join(work, "artifact")), "alice@host:/remote/artifact"])
+        self.assertEqual(os.path.basename(args[0][-2]), "upload")
+        self.assertEqual(args[0][-1], "alice@host:/remote/artifact")
+        self.assertFalse(os.path.exists(args[0][-2]))
         self.assertTrue(kwargs["check"])
 
     @mock.patch("shared.subprocess.run")

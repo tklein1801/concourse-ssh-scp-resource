@@ -1,3 +1,5 @@
+import contextlib
+import io
 import os
 import tempfile
 import unittest
@@ -39,6 +41,34 @@ class SecurityTests(unittest.TestCase):
             shared._remote_path("-oProxyCommand=evil")
         with self.assertRaises(ValueError):
             shared._remote_path("other-host:/tmp/file")
+
+    def test_upload_directory_rejects_symlink_before_scp(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = os.path.join(directory, "root")
+            os.mkdir(root)
+            with open(os.path.join(outside, "secret"), "w") as secret:
+                secret.write("secret")
+            os.symlink(os.path.join(outside, "secret"), os.path.join(root, "link"))
+            with mock.patch.object(shared.subprocess, "run") as run:
+                with self.assertRaisesRegex(ValueError, "must not contain symlinks"):
+                    shared.scpTo("user", "host", "/key", "/known_hosts", directory,
+                                 {"root": "/remote/root"})
+            run.assert_not_called()
+
+    def test_upload_status_and_commands_use_stderr(self):
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            with open(os.path.join(directory, "file"), "w") as output:
+                output.write("payload")
+            with mock.patch.object(shared.subprocess, "run", return_value=mock.Mock(stdout=b"ok")):
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    shared.scpTo("user", "host", "/key", "/known_hosts", directory,
+                                 {"file": "/remote/file"})
+                    shared.sshRun("user", "host", "/key", "/known_hosts", ["true"])
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn(" -> ", stderr.getvalue())
+        self.assertIn("['true']", stderr.getvalue())
 
 
 if __name__ == "__main__":
