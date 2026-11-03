@@ -33,6 +33,8 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(shared._remote_path("a; touch /tmp/pwned"), "a; touch /tmp/pwned")
         with self.assertRaises(ValueError):
             shared._remote_path("-oProxyCommand=evil")
+        with self.assertRaises(ValueError):
+            shared._remote_path("other-host:/tmp/file")
 
 
 if __name__ == "__main__":

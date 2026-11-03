@@ -47,7 +47,7 @@ def _local_source(root, source_file):
     return source
 
 def _remote_path(path):
-    if not isinstance(path, str) or not path or path.startswith("-") or "\x00" in path:
+    if not isinstance(path, str) or not path or path.startswith("-") or ":" in path or "\x00" in path:
         raise ValueError("Invalid remote SCP path")
     # OpenSSH's default SFTP transport passes paths without invoking a remote shell.
     return path
