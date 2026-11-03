@@ -35,17 +35,21 @@ class ResourceScriptTests(unittest.TestCase):
 
     def test_out_returns_version(self):
         config = {
-            "source": {"user": "alice", "host": "host", "private_key": "key"},
+            "source": {
+                "user": "alice",
+                "host": "host",
+                "private_key": "key",
+                "known_hosts": "host ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+            },
             "params": {},
         }
         with tempfile.TemporaryDirectory() as directory:
             result = run_script("out", [directory], json.dumps(config))
-            key_path = os.path.join(directory, "id_rsa")
 
             self.assertEqual(result.returncode, 0, result.stderr)
             output = json.loads(result.stdout)
             self.assertRegex(output["version"]["ref"], r"^out - .+")
-            self.assertEqual(os.stat(key_path).st_mode & 0o777, 0o600)
+            self.assertFalse(os.path.exists(os.path.join(directory, "id_rsa")))
 
     def test_out_rejects_missing_required_configuration(self):
         result = run_script("out", ["/tmp"], "{}")

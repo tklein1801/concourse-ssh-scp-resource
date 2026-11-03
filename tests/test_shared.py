@@ -32,7 +32,7 @@ class ValidateSchemaTests(unittest.TestCase):
 class PrivateKeyTests(unittest.TestCase):
     def test_writes_key_with_restricted_permissions(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = shared.write_private_key(directory, "test-key")
+            path = shared.write_secret(directory, "id_rsa", "test-key")
 
             with open(path) as key_file:
                 self.assertEqual(key_file.read(), "test-key")
@@ -43,39 +43,43 @@ class TransferTests(unittest.TestCase):
     @mock.patch("shared.subprocess.run")
     def test_scp_to_builds_remote_destination(self, run):
         run.return_value.stdout = b"copied"
-        shared.scpTo("alice", "host", "/key", "/work", {"artifact": "/remote/artifact"})
+        with tempfile.TemporaryDirectory() as work:
+            open(os.path.join(work, "artifact"), "w").close()
+            shared.scpTo("alice", "host", "/key", "/known_hosts", work, {"artifact": "/remote/artifact"})
 
         args, kwargs = run.call_args
-        self.assertEqual(args[0], [
-            "scp", "-oStrictHostKeyChecking=no", "-i", "/key", "-r",
-            "/work/artifact", "alice@host:/remote/artifact",
-        ])
+        self.assertIn("-oStrictHostKeyChecking=yes", args[0])
+        self.assertIn("-oUserKnownHostsFile=/known_hosts", args[0])
+        self.assertEqual(args[0][-2:], [os.path.realpath(os.path.join(work, "artifact")), "alice@host:/remote/artifact"])
         self.assertTrue(kwargs["check"])
 
     @mock.patch("shared.subprocess.run")
     def test_scp_from_builds_local_destination(self, run):
         run.return_value.stdout = b"copied"
-        shared.scpFrom("alice", "host", "/key", "/work", {"/remote/file": "file"})
+        with tempfile.TemporaryDirectory() as work:
+            shared.scpFrom("alice", "host", "/key", "/known_hosts", work, {"/remote/file": "file"})
 
         args, _ = run.call_args
-        self.assertEqual(args[0][-2:], ["alice@host:/remote/file", "/work/file"])
+        self.assertEqual(args[0][-2:], ["alice@host:/remote/file", os.path.realpath(os.path.join(work, "file"))])
 
     def test_scp_rejects_non_mapping_files(self):
         with self.assertRaisesRegex(ValueError, "Expected 'files' to be a dict"):
-            shared.scpTo("alice", "host", "/key", "/work", [])
+            shared.scpTo("alice", "host", "/key", "/known_hosts", "/work", [])
 
     @mock.patch("shared.subprocess.run")
     def test_ssh_joins_commands_and_checks_exit_status(self, run):
         run.return_value.stdout = b"done"
-        shared.sshRun("alice", "host", "/key", ["first", "second"])
+        shared.sshRun("alice", "host", "/key", "/known_hosts", ["first", "second"])
 
         args, kwargs = run.call_args
         self.assertEqual(args[0][-2:], ["alice@host", "first && second"])
+        self.assertIn("-oStrictHostKeyChecking=yes", args[0])
+        self.assertIn("-oUserKnownHostsFile=/known_hosts", args[0])
         self.assertTrue(kwargs["check"])
 
     def test_ssh_rejects_non_list_commands(self):
         with self.assertRaisesRegex(ValueError, "Expected 'commands' to be a list"):
-            shared.sshRun("alice", "host", "/key", "command")
+            shared.sshRun("alice", "host", "/key", "/known_hosts", "command")
 
 
 if __name__ == "__main__":
