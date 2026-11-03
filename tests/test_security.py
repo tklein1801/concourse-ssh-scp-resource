@@ -4,7 +4,11 @@ import unittest
 from unittest import mock
 
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+resource_dir = os.environ.get(
+    "RESOURCE_DIR",
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")),
+)
+sys.path.insert(0, resource_dir)
 import shared
 
 
